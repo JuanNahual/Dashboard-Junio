@@ -48,7 +48,7 @@ df["Importe Articulos"] = pd.to_numeric(df["Importe Articulos"], errors="coerce"
 df["Importe Envio"] = pd.to_numeric(df["Importe Envio"], errors="coerce").fillna(0)
 df["Importe"] = pd.to_numeric(df["Importe"], errors="coerce").fillna(0)
 # Título
-st.markdown("<h1 style='text-align: center;'>📊 Dashboard Estadísticas Junio</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>📊 Dashboard Estadísticas</h1>", unsafe_allow_html=True)
 # -------------------------
 # FILTROS
 # -------------------------
