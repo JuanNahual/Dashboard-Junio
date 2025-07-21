@@ -1,56 +1,93 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
 
 # Configuración de la app
 st.set_page_config(
-    page_title="Dashboard Estadísticas Junio",
+    page_title="Dashboard Estadísticas",
     page_icon="📊",
     layout="wide"
 )
 
-# Carga de datos
-df = pd.read_csv("reporte_junio.csv", delimiter=";")
+# Carpeta con archivos CSV
+csv_folder = "data"
 
-# Limpieza de columnas numéricas
-df["Importe Articulos"] = pd.to_numeric(df["Importe Articulos"], errors="coerce").fillna(0)
+# Carga de archivos CSV
+dfs = []
+
+st.sidebar.header("📂 Cargando datos...")
+
+for archivo in os.listdir(csv_folder):
+    if archivo.endswith(".csv"):
+        path = os.path.join(csv_folder, archivo)
+        df_temp = pd.read_csv(path, delimiter=";")
+        df_temp["Mes"] = archivo.replace("reporte_", "").replace(".csv", "").capitalize()
+        df_temp["Fecha"] = pd.to_datetime(df_temp["Fecha"], format="%d/%m/%y", errors="coerce")
+        df_temp = df_temp.dropna(subset=["Fecha"])  # Solo filas con fechas válidas
+        
+        dfs.append(df_temp)
+
+# Verificamos que haya datos cargados
+if not dfs:
+    st.warning("⚠️ No se cargaron datos válidos desde la carpeta `/data`.")
+    st.stop()
+
+# Concatenar todos los DataFrames en uno solo
+df = pd.concat(dfs, ignore_index=True)
+
+# Validar que existan fechas válidas
+if df["Fecha"].isna().all():
+    st.warning("⚠️ No se encontraron fechas válidas en los datos cargados.")
+    st.stop()
+df["Rubro"] = df["Rubro"].fillna("Sin rubro").replace("", "Sin rubro")
+
+# Convertir columnas numéricas
 df["Cantidad"] = pd.to_numeric(df["Cantidad"], errors="coerce").fillna(0)
+df["Importe Articulos"] = pd.to_numeric(df["Importe Articulos"], errors="coerce").fillna(0)
+df["Importe Envio"] = pd.to_numeric(df["Importe Envio"], errors="coerce").fillna(0)
 df["Importe"] = pd.to_numeric(df["Importe"], errors="coerce").fillna(0)
-df["Fecha"] = pd.to_datetime(df["Fecha"], dayfirst=True)
-
 # Título
 st.markdown("<h1 style='text-align: center;'>📊 Dashboard Estadísticas Junio</h1>", unsafe_allow_html=True)
+# -------------------------
+# FILTROS
+# -------------------------
+st.sidebar.header("🔎 Filtros")
 
-# Filtros
-with st.sidebar:
-    st.header("Filtros")
+fecha_min = df["Fecha"].min()
+fecha_max = df["Fecha"].max()
+fecha_sel = st.sidebar.date_input("Rango de fechas", [fecha_min, fecha_max])
 
-    fecha_min = df["Fecha"].min()
-    fecha_max = df["Fecha"].max()
-    fecha_sel = st.date_input("Filtrar por Fecha", [fecha_min, fecha_max])
+# Lista de valores únicos para filtros
+meses_disponibles = df["Mes"].dropna().unique().tolist()
+mes_sel = st.sidebar.multiselect("Mes", meses_disponibles, default=meses_disponibles)
+if not mes_sel:
+    mes_sel = meses_disponibles
 
-    rubros_unicos = df["Rubro"].dropna().unique().tolist()
-    rubro_sel = st.multiselect("Selecciona Rubro(s)", rubros_unicos, default=rubros_unicos)
-    if not rubro_sel:
-        rubro_sel = rubros_unicos  # Si está vacío, seleccionar todos
+rubros = df["Rubro"].dropna().unique().tolist()
+rubro_sel = st.sidebar.multiselect("Rubro", rubros, default=rubros)
+if not rubro_sel:
+    rubro_sel = rubros
 
-    usuarios_unicos = df["Usuario"].dropna().unique().tolist()
-    usuario_sel = st.multiselect("Usuario", usuarios_unicos, default=usuarios_unicos)
-    if not usuario_sel:
-        usuario_sel = usuarios_unicos
+usuarios = df["Usuario"].dropna().unique().tolist()
+usuario_sel = st.sidebar.multiselect("Usuario", usuarios, default=usuarios)
+if not usuario_sel:
+    usuario_sel = usuarios
 
-    sucursales_unicas = df["Punto de venta"].dropna().unique().tolist()
-    sucursal_sel = st.multiselect("Sucursal", sucursales_unicas, default=sucursales_unicas)
-    if not sucursal_sel:
-        sucursal_sel = sucursales_unicas
-
-    df_filtrado = df[
-        (df["Fecha"] >= pd.to_datetime(fecha_sel[0])) &
-        (df["Fecha"] <= pd.to_datetime(fecha_sel[1])) &
-        (df["Rubro"].isin(rubro_sel)) &
-        (df["Usuario"].isin(usuario_sel)) &
-        (df["Punto de venta"].isin(sucursal_sel))
-    ]
+sucursales = df["Punto de venta"].dropna().unique().tolist()
+sucursal_sel = st.sidebar.multiselect("Sucursal", sucursales, default=sucursales)
+if not sucursal_sel:
+    sucursal_sel = sucursales
+print(df['Importe Articulos'].sum())
+# Aplicar filtros
+df_filtrado = df[
+    (df["Fecha"] >= pd.to_datetime(fecha_sel[0])) &
+    (df["Fecha"] <= pd.to_datetime(fecha_sel[1])) &
+    (df["Mes"].isin(mes_sel)) &
+    (df["Rubro"].isin(rubro_sel)) &
+    (df["Usuario"].isin(usuario_sel)) &
+    (df["Punto de venta"].isin(sucursal_sel))
+]
 
 # KPIs
 st.subheader("📈 KPIs Ejecutivos")
@@ -109,4 +146,3 @@ else:
         title="Evolución de ingresos por día"
     )
     st.plotly_chart(fig6, use_container_width=True)
-
